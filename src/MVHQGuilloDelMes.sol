@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.13;
 
-import "solmate/tokens/ERC721.sol";
+import "./ERC721.sol";
 import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
+import "openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 error NonExistentTokenURI();
 error WithdrawError();
@@ -14,9 +15,20 @@ error WithdrawError();
 /** @dev TODO Any function which updates state will require a signature from an address with the correct role
     This is an upgradeable contract using UUPSUpgradeable (IERC1822Proxiable / ERC1967Proxy) from OpenZeppelin 
     TODO add ROLES */
-contract MVHQGuilloDelMes is ERC721, Ownable {
+contract MVHQGuilloDelMes is ERC721, AccessControl {
 
     using Strings for uint256;
+
+    /// @notice role assigned to an address that can perform upgrades to the contract
+    /// @dev role can be granted by the DEFAULT_ADMIN_ROLE
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    /// @notice role assigned to addresses that can perform managemenet actions
+    /// @dev role can be granted by the DEFAULT_ADMIN_ROLE
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    /// @notice role assigned to addresses that can perform minted actions
+    /// @dev role can be granted by the DEFAULT_ADMIN_ROLE
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
     string public baseURI;
     string constant DEFAULT_BASE_URI = ""; // TODO define default base URI
     uint256 public currentTokenId;
@@ -30,6 +42,7 @@ contract MVHQGuilloDelMes is ERC721, Ownable {
         string memory symbol_,
         string memory baseURI_
     ) ERC721(name_, symbol_) {  
+	_grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         bytes(baseURI_).length > 0 ? baseURI = baseURI_
                 : baseURI = DEFAULT_BASE_URI;
     }
@@ -41,7 +54,7 @@ contract MVHQGuilloDelMes is ERC721, Ownable {
 
     /// @notice Used to set the baseURI for metadata
     /// @param baseURI_ the base URI
-    function setBaseURI(string memory baseURI_) external onlyOwner { // TODO onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBaseURI(string memory baseURI_) external onlyRole(MANAGER_ROLE) {
         string memory previousURI = baseURI;
         bytes(baseURI_).length > 0 ? baseURI = baseURI_
                 : baseURI = DEFAULT_BASE_URI;
@@ -49,7 +62,7 @@ contract MVHQGuilloDelMes is ERC721, Ownable {
     }
 
     // TODO create a description
-    function mintTo(address recipient_) external onlyOwner returns (uint256) {
+    function mintTo(address recipient_) external onlyRole(MINTER_ROLE) returns (uint256) {
         
         uint256 newTokenId = ++currentTokenId;
         
@@ -79,7 +92,7 @@ contract MVHQGuilloDelMes is ERC721, Ownable {
 
     /// @notice Withdraw function in case anyone sends ETH to contract by mistake
     /// TODO create a function in case of others tokens.
-    function withdraw(address payable payee) external onlyOwner {
+    function withdraw(address payable payee) external onlyRole(MANAGER_ROLE) {
         require(payee != address(0), "INVALID_RECIPIENT");
         uint256 balance = address(this).balance;
         emit Received(payee, balance);
